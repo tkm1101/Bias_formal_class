@@ -113,7 +113,7 @@ class BIAS:
                 time.sleep(5)
 
 if __name__ == "__main__":
-    account_id=os.getenv("real_account_number")
-    access_token=os.getenv("real_access_token")
-    system = BIAS('live',account_id,access_token,'EUR_USD')
+    account_id=os.getenv("account_number")
+    access_token=os.getenv("access_token")
+    system = BIAS('practice',account_id,access_token,'EUR_USD')
     system.trading_begin()
