@@ -1,3 +1,4 @@
+#导入数据库
 import oandapy
 import os
 import pandas as pd
@@ -6,23 +7,24 @@ import time
 from datetime import datetime
 class BIAS:
     def __init__(self,environment,account_id,access_token,instrument):
+        #一些账号个人信息
         self.environment = environment
         self.account_id = account_id
         self.access_token = access_token
         self.oanda=oandapy.API(self.environment,self.access_token)
-        self.instrument = instrument
+        self.instrument = instrument 
         
-        self.minute_granularity = 'M1'
-        self.hour_granularity = 'H1'
-        self.minute_count = 5000
-        self.hour_count = 20
-        self.units = 1000
-        self.weighted_bias = 0
+        self.minute_granularity = 'M1' #分钟数据
+        self.hour_granularity = 'H1'   #小时数据
+        self.minute_count = 5000  #5000分钟
+        self.hour_count = 20 #20小时
+        self.units = 1000 #下单数量：1000张合约
+        self.weighted_bias = 0 
         self.trading_stats = 0
         self.ema1 = self.ema2 = self.ema3 = pd.Series()
         self.bias1 = self.bias2 = self.bias3 = pd.Series()
         
-        
+    #显示仓位情况    
     def trade_status(self):
         invested = self.oanda.get_trades(self.account_id)['trades']
         if invested == []:
@@ -32,14 +34,14 @@ class BIAS:
                 return 'buy'
             elif invested[0]['side'] == 'sell':
                 return 'sell'
-            
+    #下单命令        
     def send_order(self,side,units):
         return self.oanda.create_order(account_id=self.account_id,
                                       instrument=self.instrument,
                                       units=units,
                                       side=side,
                                       type='market')
-                                      
+    #当前趋势指标                                  
     def bull_bear_indicator(self):
         self.df = pd.DataFrame(self.oanda.get_history(instrument=self.instrument,
                                                granularity = self.hour_granularity,
@@ -52,6 +54,7 @@ class BIAS:
         elif self.hour_df[self.hour_count-1] > self.hour_df.mean():
             return 'bull market'
     
+    #交易逻辑
     def perform_trade_logic(self,trading_stats,lower,upper,mean):
         
         if self.trade_status() == 'empty':
@@ -74,6 +77,7 @@ class BIAS:
     def BIAS(self,number,data,EMA):
         return (data-EMA)/EMA
     
+    #数据分析
     def analysis(self):
         self.df = pd.DataFrame(self.oanda.get_history(instrument=self.instrument,
                                                granularity = self.minute_granularity,
@@ -81,15 +85,18 @@ class BIAS:
         self.midclose = pd.DataFrame((self.df['closeAsk']+
                                       self.df['closeBid'])/2,columns=['MidClose'])['MidClose']
         
+        #6，12以及24日EMA
         self.ema1,self.ema2,self.ema3 = self.EMA(6,self.midclose),self.EMA(12,self.midclose),self.EMA(24,self.midclose)
         
+        #相对应乖离率
         self.bias1, self.bias2, self.bias3 = self.BIAS(6,self.midclose,self.ema1),self.BIAS(12,self.midclose,self.ema2),self.BIAS(24,self.midclose,self.ema3)
-        
+        #权重乖离
         self.weighted_bias = (5*self.bias1+3*self.bias2+2*self.bias3)/10
         
+        #交易信号
         self.trading_stats = self.weighted_bias/self.midclose
-        self.lower = np.percentile(self.trading_stats,10)
-        self.upper = np.percentile(self.trading_stats,90)
+        self.lower = np.percentile(self.trading_stats,10) #低位临界值
+        self.upper = np.percentile(self.trading_stats,90) #高位临界值
         self.mean = self.trading_stats.mean()
         
         
